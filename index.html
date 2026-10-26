@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>University Room Reservations</title>
+</head>
+<body>
+  <h1>University Room reservations</h1>
+
+  <form id="reservationForm">
+    <input name="room" placeholder="Room" required>
+    <h2>
+    <input name="reserved_by" placeholder="Reserved by" required>
+    <input name="date" type="date" required>
+    <input name="start_time" type="time" required>
+    <input name="end_time" type="time" required>
+    <button>Add reservation</button>
+    </h2>
+  </form>
+
+  <form id="searchForm">
+    <input name="id" type="number" placeholder="Reservation ID" required>
+    <button>Search</button>
+    <button type="button" id="showAll">Show all</button>
+  </form>
+
+  <p id="message"></p>
+  <table>
+    <thead>
+      <tr><th>ID</th><th>Room</th><th>Reserved by</th><th>Date</th><th>Start</th><th>End</th><th></th></tr>
+    </thead>
+    <tbody id="reservations"></tbody>
+  </table>
+
+  <script>
+    const api = '/api/reservations';
+    const rows = document.getElementById('reservations');
+    const message = document.getElementById('message');
+
+    async function request(url, options) {
+      const response = await fetch(url, options);
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error);
+      return data;
+    }
+
+    function showReservations(list) {
+      rows.replaceChildren();
+      for (const reservation of list) {
+        const row = rows.insertRow();
+        for (const value of [reservation.id, reservation.room, reservation.reserved_by,
+          reservation.date, reservation.start_time, reservation.end_time]) {
+          row.insertCell().textContent = value;
+        }
+        const button = document.createElement('button');
+        button.textContent = 'Delete';
+        button.onclick = () => removeReservation(reservation.id);
+        row.insertCell().append(button);
+      }
+    }
+
+    async function loadReservations() {
+      try {
+        showReservations(await request(api));
+        message.textContent = '';
+      } catch (error) {
+        message.textContent = error.message;
+      }
+    }
+
+    document.getElementById('reservationForm').onsubmit = async event => {
+      event.preventDefault();
+      const form = event.target;
+      try {
+        await request(api, { method: 'POST', body: JSON.stringify(Object.fromEntries(new FormData(form))),
+          headers: { 'Content-Type': 'application/json' } });
+        form.reset();
+        message.textContent = 'Reservation added';
+        loadReservations();
+      } catch (error) {
+        message.textContent = error.message;
+      }
+    };
+
+    document.getElementById('searchForm').onsubmit = async event => {
+      event.preventDefault();
+      try {
+        const id = new FormData(event.target).get('id');
+        showReservations([await request(`${api}/${id}`)]);
+        message.textContent = '';
+      } catch (error) {
+        showReservations([]);
+        message.textContent = error.message;
+      }
+    };
+
+    async function removeReservation(id) {
+      if (!confirm(`Delete reservation #${id}?`)) return;
+      try {
+        await request(`${api}/${id}`, { method: 'DELETE' });
+        message.textContent = 'Reservation deleted';
+        loadReservations();
+      } catch (error) {
+        message.textContent = error.message;
+      }
+    }
+
+    document.getElementById('showAll').onclick = loadReservations;
+    loadReservations();
+  </script>
+</body>
+</html>
